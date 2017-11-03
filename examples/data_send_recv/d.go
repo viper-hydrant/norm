@@ -8,7 +8,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/aletheia7/norm"
+	"github.com/viper-hydrant/norm"
 	"log"
 	"os"
 	"os/signal"

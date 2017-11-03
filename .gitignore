@@ -1,1 +1,25 @@
 norm/
+
+examples/data_send_recv/data_send_recv
+examples/file_send_recv/file_send_recv
+examples/file_send_recv/normTemp*
+examples/stream_send_recv/stream_send_recv
+
+### Go template
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
+.glide/
+
+
+.idea
