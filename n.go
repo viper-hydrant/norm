@@ -372,7 +372,12 @@ func (o *Instance) Get_version() string {
 }
 
 func (o *Instance) sess() *Session {
-	return o.sess_db[norm_session_handle(o.nevent.session)]
+	if nil == o.nevent.session {
+		return nil
+	}
+	handle := norm_session_handle(o.nevent.session)
+	var ptr uintptr = uintptr(handle)
+	return o.sess_db[ptr]
 }
 
 func (o *Instance) obj() *Object {

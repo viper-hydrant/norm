@@ -633,18 +633,18 @@ func (o *Node) release() {
 
 type (
 	norm_instance_handle C.NormInstanceHandle
-	norm_event           C.NormEvent
-	norm_session_handle  C.NormSessionHandle
-	norm_node_id         C.NormNodeId
-	norm_session_id      C.NormSessionId
-	norm_object_handle   C.NormObjectHandle
-	norm_node_handle     C.NormNodeHandle
-	norm_acking_status   C.NormAckingStatus
-	norm_sync_policy     C.NormSyncPolicy
-	norm_nacking_mode    C.NormNackingMode
+	norm_event C.NormEvent
+	norm_session_handle C.NormSessionHandle
+	norm_node_id C.NormNodeId
+	norm_session_id C.NormSessionId
+	norm_object_handle C.NormObjectHandle
+	norm_node_handle C.NormNodeHandle
+	norm_acking_status C.NormAckingStatus
+	norm_sync_policy C.NormSyncPolicy
+	norm_nacking_mode C.NormNackingMode
 	norm_repair_boundary C.NormRepairBoundary
-	p_c_char             *C.char
-	c_uint               C.uint
+	p_c_char *C.char
+	c_uint C.uint
 )
 
 const (
@@ -698,19 +698,21 @@ func b2uint(o *bytes.Buffer) C.uint {
 	return (C.uint)(o.Len())
 }
 
-type refdb map[norm_session_handle]*Session
+type refdb map[uintptr]*Session
 
 func (o refdb) add(sess *Session) {
-	if _, ok := o[sess.handle]; ok {
+	var ptr uintptr = uintptr(sess.handle)
+	if _, ok := o[ptr]; ok {
 		panic("session already addeed to refdb")
 	} else {
-		o[sess.handle] = sess
+		o[ptr] = sess
 	}
 }
 
 func (o refdb) remove(sess *Session) {
-	if _, ok := o[sess.handle]; ok {
-		delete(o, sess.handle)
+	var ptr uintptr = uintptr(sess.handle)
+	if _, ok := o[ptr]; ok {
+		delete(o, ptr)
 	} else {
 		panic("session doesn't exist in refdb")
 	}
@@ -739,6 +741,9 @@ func (o *Instance) do_event() error {
 	if !C.NormGetNextEvent(C.NormInstanceHandle(o.handle), &ne, true) {
 		return nil
 	}
+	// TODO: fix copy-back
+	o.nevent = norm_event(ne)
+
 	ev := Event_type(1) << Event_type(o.nevent._type)
 	// Allow updated, completed or check subscribed Events
 	if nil == o.sess() || ev&o.sess().events == 0 {
