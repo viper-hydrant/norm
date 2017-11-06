@@ -6,6 +6,13 @@
 //go:generate rm norm-build
 
 package norm
+/*
+#cgo CFLAGS:  -I${SRCDIR}/norm/include -I${SRCDIR}/protolib/include
+#cgo LDFLAGS: -L${SRCDIR}/norm/lib -lnorm -L${SRCDIR}/norm/protolib/lib  -lprotokit -lpthread -lstdc++ -lm
+#include <stdlib.h>
+#include "normApi.h"
+*/
+import "C"
 
 import (
 	"bytes"
@@ -153,7 +160,7 @@ const (
 	Object_type_stream             = object_type_stream
 )
 
-type Node_id norm_node_id
+type Node_id C.NormNodeId
 
 var nn = map[Node_id]string{
 	Node_none: "node none",
@@ -179,7 +186,7 @@ var as = map[Acking_status]string{
 	Ack_success: "ack success",
 }
 
-type Acking_status norm_acking_status
+type Acking_status C.NormAckingStatus
 
 const (
 	Ack_invalid Acking_status = ack_invalid
@@ -192,7 +199,7 @@ func (o Acking_status) String() string {
 	return as[o]
 }
 
-type Sync_policy norm_sync_policy
+type Sync_policy C.NormSyncPolicy
 
 const (
 	Sync_current Sync_policy = sync_current
@@ -208,7 +215,7 @@ func (o Sync_policy) String() string {
 	return sp[o]
 }
 
-type Nacking_mode norm_nacking_mode
+type Nacking_mode C.NormNackingMode
 
 const (
 	Nack_none      Nacking_mode = nack_none
@@ -226,7 +233,7 @@ func (o Nacking_mode) String() string {
 	return nm[o]
 }
 
-type Repair_boundary norm_repair_boundary
+type Repair_boundary C.NormRepairBoundary
 
 var rb = map[Repair_boundary]string{
 	Boundary_block:  "repair block",
@@ -247,8 +254,8 @@ type Instance struct {
 	wg      *sync.WaitGroup
 	ctx     context.Context
 	cancel  context.CancelFunc
-	handle  norm_instance_handle
-	nevent  norm_event
+	handle  C.NormInstanceHandle
+	nevent  C.NormEvent
 	sess_db refdb
 }
 
@@ -375,21 +382,21 @@ func (o *Instance) sess() *Session {
 	if nil == o.nevent.session {
 		return nil
 	}
-	handle := norm_session_handle(o.nevent.session)
+	handle := o.nevent.session
 	var ptr uintptr = uintptr(handle)
 	return o.sess_db[ptr]
 }
 
 func (o *Instance) obj() *Object {
-	return o.sess().objects[norm_object_handle(o.nevent.object)]
+	return o.sess().objects[o.nevent.object]
 }
 
 type Session struct {
 	i              *Instance
 	events         Event_type // bit mask
 	c              chan *Event
-	handle         norm_session_handle
-	objects        map[norm_object_handle]*Object
+	handle         C.NormSessionHandle
+	objects        map[C.NormObjectHandle]*Object
 	obj            *Object
 	user_data_lock sync.Mutex
 	user_data      interface{}
@@ -491,9 +498,9 @@ func (o *Session) Set_tx_rate_bounds(rate_min, rate_max float64) {
 func (o *Session) Start_sender(id uint32, buffer_space uint, segment_size, block_size, num_parity uint16, fec_id uint8) bool {
 	lock.Lock()
 	defer lock.Unlock()
-	pid := norm_session_id(id)
+	pid := C.NormSessionId(id)
 	if pid == 0 {
-		pid = norm_session_id(uint32(time.Now().Unix()))
+		pid = C.NormSessionId(uint32(time.Now().Unix()))
 	}
 	pbuffer_space := buffer_space
 	if pbuffer_space == 0 {
@@ -1005,7 +1012,7 @@ func (o *Session) Set_user_data(user_data interface{}) {
 	o.user_data = user_data
 }
 
-func (o *Session) release(oh norm_object_handle) {
+func (o *Session) release(oh C.NormObjectHandle) {
 	if obj, ok := o.objects[oh]; ok {
 		delete(o.objects, oh)
 		if o.obj == obj {
@@ -1018,7 +1025,7 @@ func (o *Session) release_all() {
 	if o.obj != nil {
 		o.obj = nil
 	}
-	o.objects = map[norm_object_handle]*Object{}
+	o.objects = map[C.NormObjectHandle]*Object{}
 }
 
 type Object struct {
@@ -1029,7 +1036,7 @@ type Object struct {
 	info *bytes.Buffer // Session.Data_enqueue()
 	data *bytes.Buffer // Session.Data_enqueue()
 
-	handle          norm_object_handle
+	handle          C.NormObjectHandle
 	retained        bool
 	stream_read_buf *bytes.Buffer
 }
@@ -1352,10 +1359,10 @@ func (o *Object) destroy() {
 }
 
 type Node struct {
-	handle norm_node_handle
+	handle C.NormNodeHandle
 }
 
-func new_node(handle norm_node_handle) *Node {
+func new_node(handle C.NormNodeHandle) *Node {
 	return &Node{handle: handle}
 }
 
