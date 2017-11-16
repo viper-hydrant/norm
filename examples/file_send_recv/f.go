@@ -38,7 +38,7 @@ var (
 func do_send() {
 	defer wg.Done()
 	defer cancel()
-	i, err := norm.Create_instance(wg)
+	i, err := norm.Create_instance(wg, &sync.Mutex{})
 	if err != nil {
 		log.Println(err)
 		return
@@ -109,7 +109,7 @@ func do_send() {
 func do_recv() {
 	defer wg.Done()
 	defer cancel()
-	i, err := norm.Create_instance(wg)
+	i, err := norm.Create_instance(wg, &sync.Mutex{})
 	if err != nil {
 		log.Println(err)
 		return

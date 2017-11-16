@@ -6,6 +6,7 @@
 //go:generate rm norm-build
 
 package norm
+
 /*
 #cgo CFLAGS:  -I${SRCDIR}/norm/include -I${SRCDIR}/protolib/include
 #cgo LDFLAGS: -L${SRCDIR}/norm/lib -lnorm -L${SRCDIR}/norm/protolib/lib  -lprotokit -lpthread -lstdc++ -lm
@@ -29,12 +30,8 @@ const (
 )
 
 var (
-	E_session_invalid               = errors.New("session invalid")
-	E_object_invalid                = errors.New("object invalid")
-	E_false                         = errors.New("false")
-	E_sender_sessions_not_destroyed error
-	lock                            sync.Mutex
-	object_id_ct                    uint64
+	ESessionInvalid = errors.New("session invalid")
+	EObjectInvalid  = errors.New("object invalid")
 )
 
 type Event struct {
@@ -257,6 +254,7 @@ type Instance struct {
 	handle  C.NormInstanceHandle
 	nevent  C.NormEvent
 	sess_db refdb
+	lock    sync.Locker
 }
 
 // If wg is not nil, wg.Add()/wg.Done() will be called for the internal
@@ -264,36 +262,40 @@ type Instance struct {
 //
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormCreateInstance
 //
-func Create_instance(wg *sync.WaitGroup) (r *Instance, err error) {
+func Create_instance(wg *sync.WaitGroup, lock sync.Locker) (r *Instance, err error) {
 	lock.Lock()
 	defer lock.Unlock()
 	if wg == nil {
 		wg = &sync.WaitGroup{}
 	}
-	return create_instance(wg)
+	r, err = create_instance(wg)
+	if nil != r {
+		r.lock = lock
+	}
+	return r, err
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormDestroyInstance
 //
 func (o *Instance) Destroy() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.cancel()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStopInstance
 //
 func (o *Instance) Stop_instance() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.stop()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormRestartInstance
 //
 func (o *Instance) Restart_instance() bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.restart()
 }
 
@@ -301,24 +303,24 @@ func (o *Instance) Restart_instance() bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetCacheDirectory
 //
 func (o *Instance) Set_cache_directory(cache_path string) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.set_cache_directory(cache_path)
 }
 
 // Set_debug applies to Instance and not libnorm.
 //
 func (o *Instance) Set_debug(debug bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.debug = debug
 }
 
 // Get_debug applies to Instance and not libnorm.
 //
 func (o *Instance) Get_debug() bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.debug
 }
 
@@ -327,8 +329,8 @@ func (o *Instance) Get_debug() bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetDebugLevel
 //
 func (o *Instance) Set_debug_level(debug_level uint) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_debug_level(debug_level)
 }
 
@@ -337,44 +339,44 @@ func (o *Instance) Set_debug_level(debug_level uint) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormOpenDebugLog
 //
 func (o *Instance) Open_debug_log(file_name string) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.open_debug_log(file_name)
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormCloseDebugLog
 //
 func (o *Instance) Close_debug_log() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.close_debug_log()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormOpenDebugPipe
 //
 func (o *Instance) Open_debug_pipe(file_name string) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.open_debug_pipe(file_name)
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormCloseDebugPipe
 //
 func (o *Instance) Close_debug_pipe() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.close_debug_pipe()
 }
 
 func (o *Instance) Get_debug_level() uint {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_debug_level()
 }
 
 func (o *Instance) Get_version() string {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_version()
 }
 
@@ -383,7 +385,7 @@ func (o *Instance) sess() *Session {
 		return nil
 	}
 	handle := o.nevent.session
-	var ptr uintptr = uintptr(handle)
+	var ptr = uintptr(handle)
 	return o.sess_db[ptr]
 }
 
@@ -400,6 +402,8 @@ type Session struct {
 	obj            *Object
 	user_data_lock sync.Mutex
 	user_data      interface{}
+	lock           sync.Locker
+	objectIdCt      uint64
 }
 
 // node_id: 0, set to time.Now()
@@ -409,20 +413,24 @@ type Session struct {
 // https://raw.githubusercontent.com/aletheia7/norm/master/norm/NormSocketBindingNotes.txt
 //
 func (o *Instance) Create_session(address string, port int, node_id Node_id) (r *Session, err error) {
-	lock.Lock()
-	defer lock.Unlock()
-	return o.create_session(address, port, node_id)
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	r, err = o.create_session(address, port, node_id)
+	if nil != r {
+		r.lock = o.lock
+	}
+	return r, err
 }
 
 func (o *Session) Events() <-chan *Event {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.c
 }
 
 func (o *Session) Get_events() Event_type {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.events
 }
 
@@ -437,8 +445,8 @@ func (o *Session) Get_events() Event_type {
 //  sess.Set_events(sess.Get_events() &^ (Event_type_grtt_updated | Event_type_tx_object_sent))
 //
 func (o *Session) Set_events(events Event_type) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.events = events
 }
 
@@ -447,14 +455,14 @@ func (o *Session) Set_events(events Event_type) {
 // Destroy also ends the internal goroutine.
 //
 func (o *Session) Destroy() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.destroy()
 }
 
 func (o *Session) Set_message_trace(trace bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_message_trace(trace)
 }
 
@@ -463,8 +471,8 @@ func (o *Session) Set_message_trace(trace bool) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormGetTxRate
 //
 func (o *Session) Get_tx_rate() float64 {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_tx_rate()
 }
 
@@ -473,8 +481,8 @@ func (o *Session) Get_tx_rate() float64 {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetTxRate
 //
 func (o *Session) Set_tx_rate(tx_rate float64) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_tx_rate(tx_rate)
 }
 
@@ -483,8 +491,8 @@ func (o *Session) Set_tx_rate(tx_rate float64) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetTxRateBounds
 //
 func (o *Session) Set_tx_rate_bounds(rate_min, rate_max float64) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_tx_rate_bounds(rate_min, rate_max)
 }
 
@@ -496,8 +504,8 @@ func (o *Session) Set_tx_rate_bounds(rate_min, rate_max float64) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStartSender
 //
 func (o *Session) Start_sender(id uint32, buffer_space uint, segment_size, block_size, num_parity uint16, fec_id uint8) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	pid := C.NormSessionId(id)
 	if pid == 0 {
 		pid = C.NormSessionId(uint32(time.Now().Unix()))
@@ -524,8 +532,8 @@ func (o *Session) Start_sender(id uint32, buffer_space uint, segment_size, block
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStopSender
 //
 func (o *Session) Stop_sender() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.stop_sender()
 }
 
@@ -537,16 +545,16 @@ func (o *Session) Stop_sender() {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetCongestionControl
 //
 func (o *Session) Set_congestion_control(enable, adjust_rate bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_congestion_control(enable, adjust_rate)
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetTxOnly
 //
 func (o *Session) Set_tx_only(tx_only, connect_to_session_address bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_tx_only(tx_only, connect_to_session_address)
 }
 
@@ -560,8 +568,8 @@ func (o *Session) Set_tx_only(tx_only, connect_to_session_address bool) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormDataEnqueue
 //
 func (o *Session) Data_enqueue(data, info []byte) (*Object, error) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.data_enqueue(data, info)
 }
 
@@ -572,16 +580,16 @@ func (o *Session) Data_enqueue(data, info []byte) (*Object, error) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormRequeueObject
 //
 func (o *Session) Requeue_object(obj *Object) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.requeue_object(obj)
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetLoopback
 //
 func (o *Session) Set_loopback(enable bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_loopback(enable)
 }
 
@@ -592,8 +600,8 @@ func (o *Session) Set_loopback(enable bool) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetTxPort
 //
 func (o *Session) Set_tx_port(tx_port uint16, tx_port_reuse bool, tx_bind_address string) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.set_tx_port(tx_port, tx_port_reuse, tx_bind_address)
 }
 
@@ -605,8 +613,8 @@ func (o *Session) Set_tx_port(tx_port uint16, tx_port_reuse bool, tx_bind_addres
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetTxCacheBounds
 //
 func (o *Session) Set_tx_cache_bounds(size_max uint, count_min, count_max uint32) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_tx_cache_bounds(size_max, count_min, count_max)
 }
 
@@ -615,8 +623,8 @@ func (o *Session) Set_tx_cache_bounds(size_max uint, count_min, count_max uint32
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormAddAckingNode
 //
 func (o *Session) Add_acking_node(node_id Node_id) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.add_acking_node(node_id)
 }
 
@@ -625,8 +633,8 @@ func (o *Session) Add_acking_node(node_id Node_id) bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormRemoveAckingNode
 //
 func (o *Session) Add_remove_acking_node(node_id uint32) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.add_remove_acking_node(node_id)
 }
 
@@ -635,8 +643,8 @@ func (o *Session) Add_remove_acking_node(node_id uint32) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormGetNextAckingNode
 //
 func (o *Session) Get_next_acking_node(status Acking_status) (node_id uint32, success bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_next_acking_node(status)
 }
 
@@ -645,8 +653,8 @@ func (o *Session) Get_next_acking_node(status Acking_status) (node_id uint32, su
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormGetAckingStatus
 //
 func (o *Session) Get_acking_status(node_id uint32) Acking_status {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_acking_status(node_id)
 }
 
@@ -655,8 +663,8 @@ func (o *Session) Get_acking_status(node_id uint32) Acking_status {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetWatermark
 //
 func (o *Session) Set_watermark(obj *Object, override_flush bool) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.set_watermark(obj, override_flush)
 }
 
@@ -665,8 +673,8 @@ func (o *Session) Set_watermark(obj *Object, override_flush bool) bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormCancelWatermark
 //
 func (o *Session) Cancel_watermark() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.cancel_watermark()
 }
 
@@ -677,8 +685,8 @@ func (o *Session) Cancel_watermark() {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetDefaultUnicastNack
 //
 func (o *Session) Set_default_unicast_nack(enable bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_default_unicast_nack(enable)
 }
 
@@ -687,8 +695,8 @@ func (o *Session) Set_default_unicast_nack(enable bool) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetDefaultRepairBoundary
 //
 func (o *Session) Set_default_repair_boundary(boundary Repair_boundary) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_default_repair_boundary(boundary)
 }
 
@@ -699,8 +707,8 @@ func (o *Session) Set_default_repair_boundary(boundary Repair_boundary) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetRxPortReuse
 //
 func (o *Session) Set_rx_port_reuse(rx_port_reuse bool, rx_bind_address, rx_sender_address string, rx_sender_address_port uint16) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_rx_port_reuse(rx_port_reuse, rx_bind_address, rx_sender_address, rx_sender_address_port)
 }
 
@@ -709,8 +717,8 @@ func (o *Session) Set_rx_port_reuse(rx_port_reuse bool, rx_bind_address, rx_send
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStartReceiver
 //
 func (o *Session) Start_receiver(buffer uint) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.start_receiver(buffer)
 }
 
@@ -719,8 +727,8 @@ func (o *Session) Start_receiver(buffer uint) bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStopReceiver
 //
 func (o *Session) Stop_receiver() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.stop_receiver()
 }
 
@@ -729,8 +737,8 @@ func (o *Session) Stop_receiver() {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetSilentReceiver
 //
 func (o *Session) Set_silent_receiver(silent bool, max_delay int) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_silent_receiver(silent, max_delay)
 }
 
@@ -743,8 +751,8 @@ func (o *Session) Set_silent_receiver(silent bool, max_delay int) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetRxCacheLimit
 //
 func (o *Session) Set_rx_cache_limit(rx_cache_limit int) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_rx_cache_limit(rx_cache_limit)
 }
 
@@ -753,8 +761,8 @@ func (o *Session) Set_rx_cache_limit(rx_cache_limit int) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetDefaultSyncPolicy
 //
 func (o *Session) Set_default_sync_Policy(policy Sync_policy) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_default_sync_Policy(policy)
 }
 
@@ -763,8 +771,8 @@ func (o *Session) Set_default_sync_Policy(policy Sync_policy) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetDefaultRxRobustFactor
 //
 func (o *Session) Set_default_rx_robust_factor(rx_robust_factor int) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_default_rx_robust_factor(rx_robust_factor)
 }
 
@@ -773,8 +781,8 @@ func (o *Session) Set_default_rx_robust_factor(rx_robust_factor int) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamOpen
 //
 func (o *Session) Stream_open(buffer_size int, info []byte) (obj *Object, err error) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.stream_open(buffer_size, info)
 }
 
@@ -783,8 +791,8 @@ func (o *Session) Stream_open(buffer_size int, info []byte) (obj *Object, err er
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetDefaultNackingMode
 //
 func (o *Session) Set_default_nacking_mode(mode Nacking_mode) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_default_nacking_mode(mode)
 }
 
@@ -796,8 +804,8 @@ func (o *Session) Set_default_nacking_mode(mode Nacking_mode) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormFileEnqueue
 //
 func (o *Session) File_enqueue(file_name string, info []byte) (*Object, error) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.file_enqueue(file_name, info)
 }
 
@@ -806,8 +814,8 @@ func (o *Session) File_enqueue(file_name string, info []byte) (*Object, error) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSendCommand
 //
 func (o *Session) Send_command(cmd []byte, robust bool) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.send_command(cmd, robust)
 }
 
@@ -816,40 +824,40 @@ func (o *Session) Send_command(cmd []byte, robust bool) bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormCancelCommand
 //
 func (o *Session) Cancel_command() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.cancel_command()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetTxSocketBuffer
 //
 func (o *Session) Set_tx_socket_buffer(buffer_size uint) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.set_tx_socket_buffer(buffer_size)
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetFlowControl
 //
 func (o *Session) Set_flow_control(factor float64) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_flow_control(factor)
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetAutoParity
 //
 func (o *Session) Set_auto_parity(auto_parity uint8) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_auto_parity(auto_parity)
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetRxSocketBuffer
 //
 func (o *Session) Set_rx_socket_buffer(buffer_size uint) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.set_rx_socket_buffer(buffer_size)
 }
 
@@ -858,8 +866,8 @@ func (o *Session) Set_rx_socket_buffer(buffer_size uint) bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormGetLocalNodeId
 //
 func (o *Session) Get_local_node_id() Node_id {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_local_node_id()
 }
 
@@ -868,8 +876,8 @@ func (o *Session) Get_local_node_id() Node_id {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetMulticastInterface
 //
 func (o *Session) Set_multicast_interface(address string) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.set_multicast_interface(address)
 }
 
@@ -878,8 +886,8 @@ func (o *Session) Set_multicast_interface(address string) bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetSSM
 //
 func (o *Session) Set_ssm(address string) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.set_ssm(address)
 }
 
@@ -888,8 +896,8 @@ func (o *Session) Set_ssm(address string) bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetTTL
 //
 func (o *Session) Set_ttl(ttl uint8) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.set_ttl(ttl)
 }
 
@@ -898,8 +906,8 @@ func (o *Session) Set_ttl(ttl uint8) bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetTOS
 //
 func (o *Session) Set_tos(tos uint8) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.set_tos(tos)
 }
 
@@ -908,8 +916,8 @@ func (o *Session) Set_tos(tos uint8) bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetFragmentation
 //
 func (o *Session) Set_fragmentation(enable bool) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.set_fragmentation(enable)
 }
 
@@ -918,8 +926,8 @@ func (o *Session) Set_fragmentation(enable bool) bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormGetGrttEstimate
 //
 func (o *Session) Get_grtt_estimate() float64 {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_grtt_estimate()
 }
 
@@ -928,8 +936,8 @@ func (o *Session) Get_grtt_estimate() float64 {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetGrttEstimate
 //
 func (o *Session) Set_grtt_estimate(grtt float64) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_grtt_estimate(grtt)
 }
 
@@ -938,8 +946,8 @@ func (o *Session) Set_grtt_estimate(grtt float64) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetGrttMax
 //
 func (o *Session) Set_grtt_max(max float64) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_grtt_max(max)
 }
 
@@ -948,8 +956,8 @@ func (o *Session) Set_grtt_max(max float64) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetGrttProbingMode
 //
 func (o *Session) Set_grtt_probing_mode(mode Probe_mode) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_grtt_probing_mode(mode)
 }
 
@@ -958,8 +966,8 @@ func (o *Session) Set_grtt_probing_mode(mode Probe_mode) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetGrttProbingInterval
 //
 func (o *Session) Set_grtt_probing_interval(min, max float64) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_grtt_probing_interval(min, max)
 }
 
@@ -968,8 +976,8 @@ func (o *Session) Set_grtt_probing_interval(min, max float64) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetBackoffFactor
 //
 func (o *Session) Set_backoff_factor(factor float64) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_backoff_factor(factor)
 }
 
@@ -978,8 +986,8 @@ func (o *Session) Set_backoff_factor(factor float64) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetGroupSize
 //
 func (o *Session) Set_group_size(size uint) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_group_size(size)
 }
 
@@ -988,8 +996,8 @@ func (o *Session) Set_group_size(size uint) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetTxRobustFactor
 //
 func (o *Session) Set_tx_robust_factor(factor int) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_tx_robust_factor(factor)
 }
 
@@ -1039,35 +1047,37 @@ type Object struct {
 	handle          C.NormObjectHandle
 	retained        bool
 	stream_read_buf *bytes.Buffer
+	lock            sync.Locker
 }
 
 // Only Id and Type.
 //
 func (o Object) String() string {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return fmt.Sprintf("object id: %v, type: %v", o.Id, o.ot)
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormFileRename
 //
 func (o *Object) File_rename(new_file_name string) bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.file_rename(new_file_name)
 }
 
-func new_object(data, info []byte, t Object_type) *Object {
+func new_object(data, info []byte, t Object_type, lock sync.Locker) *Object {
 	r := &Object{
 		ot:   t,
 		data: bytes.NewBuffer(data),
 		info: bytes.NewBuffer(info),
+		lock: lock,
 	}
 	return r
 }
 
-func new_object_buf(data, info *bytes.Buffer, t Object_type) *Object {
-	r := &Object{ot: t}
+func new_object_buf(data, info *bytes.Buffer, t Object_type, lock sync.Locker) *Object {
+	r := &Object{ot: t, lock:lock}
 	r.set_info(info)
 	r.set_data(data)
 	return r
@@ -1082,8 +1092,8 @@ func (o *Object) Get_type() Object_type {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormObjectHasInfo
 //
 func (o *Object) Has_info() bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.has_info()
 }
 
@@ -1106,64 +1116,64 @@ func (o *Object) set_data(data *bytes.Buffer) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormObjectGetInfoLength
 //
 func (o *Object) Get_info_length() int {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_info_length()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormObjectGetInfo
 //
 func (o *Object) Get_info() (info *bytes.Buffer) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_info()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormObjectGetSize
 //
 func (o *Object) Get_size() uint64 {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_size()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormObjectGetBytesPending
 //
 func (o *Object) Get_bytes_pending() uint64 {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_bytes_pending()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormObjectCancel
 //
 func (o *Object) Cancel() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.cancel()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormObjectRetain
 //
 func (o *Object) Retain() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	if !o.retained {
 		o.retain()
 	}
 }
 
 func (o *Object) Is_retained() bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.retained
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormObjectRelease
 //
 func (o *Object) Release() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	if o.retained {
 		o.release()
 	}
@@ -1174,8 +1184,8 @@ func (o *Object) Release() {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamRead
 //
 func (o *Object) Stream_read() (data *bytes.Buffer, ret bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.stream_read()
 }
 
@@ -1184,8 +1194,8 @@ func (o *Object) Stream_read() (data *bytes.Buffer, ret bool) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamWrite
 //
 func (o *Object) Stream_write(data []byte) int {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	if o.ot != Object_type_stream || len(data) == 0 {
 		return 0
 	}
@@ -1199,8 +1209,8 @@ func (o *Object) Stream_write(data []byte) int {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamClose
 //
 func (o *Object) Stream_close(graceful bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.stream_close(graceful)
 }
 
@@ -1209,8 +1219,8 @@ func (o *Object) Stream_close(graceful bool) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamMarkEom
 //
 func (o *Object) Stream_mark_eom() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.stream_mark_eom()
 }
 
@@ -1255,8 +1265,8 @@ func (o Probe_mode) String() string {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamFlush
 //
 func (o *Object) Stream_flush(eom bool, mode Flush_mode) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.stream_flush(eom, mode)
 }
 
@@ -1265,8 +1275,8 @@ func (o *Object) Stream_flush(eom bool, mode Flush_mode) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamSetAutoFlush
 //
 func (o *Object) Stream_set_auto_flush(mode Flush_mode) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.stream_set_auto_flush(mode)
 }
 
@@ -1275,8 +1285,8 @@ func (o *Object) Stream_set_auto_flush(mode Flush_mode) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamSetPushEnable
 //
 func (o *Object) Stream_set_push_enable(enable bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.stream_set_push_enable(enable)
 }
 
@@ -1285,8 +1295,8 @@ func (o *Object) Stream_set_push_enable(enable bool) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamHasVacancy
 //
 func (o *Object) Stream_has_vacancy() bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.stream_has_vacancy()
 }
 
@@ -1295,8 +1305,8 @@ func (o *Object) Stream_has_vacancy() bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamSeekMsgStart
 //
 func (o *Object) Stream_seek_msg_start() bool {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.stream_seek_msg_start()
 }
 
@@ -1305,8 +1315,8 @@ func (o *Object) Stream_seek_msg_start() bool {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormStreamGetReadOffset
 //
 func (o *Object) Stream_get_read_offset() uint64 {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.stream_get_read_offset()
 }
 
@@ -1315,24 +1325,24 @@ func (o *Object) Stream_get_read_offset() uint64 {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormObjectSetNackingMode
 //
 func (o *Object) Set_nacking_mode(mode Nacking_mode) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_nacking_mode(mode)
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormFileGetName
 //
 func (o *Object) File_get_name() (file_name *bytes.Buffer) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.file_get_name()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormDataAccessData
 //
 func (o *Object) Data_access_data(release bool) (data *bytes.Buffer) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.data_access_data(release)
 }
 
@@ -1345,8 +1355,8 @@ func (o *Object) Data_detach_data() {}
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormObjectGetSender
 //
 func (o *Object) Get_sender() (node *Node) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_sender()
 }
 
@@ -1360,17 +1370,18 @@ func (o *Object) destroy() {
 
 type Node struct {
 	handle C.NormNodeHandle
+	lock sync.Locker
 }
 
-func new_node(handle C.NormNodeHandle) *Node {
-	return &Node{handle: handle}
+func new_node(handle C.NormNodeHandle, lock sync.Locker) *Node {
+	return &Node{handle: handle, lock:lock}
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormNodeGetId
 //
 func (o *Node) Get_id() uint32 {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_id()
 }
 
@@ -1379,16 +1390,16 @@ func (o *Node) Get_id() uint32 {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormNodeGetAddress
 //
 func (o *Node) Get_address() (address string, port uint16, success bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_address()
 }
 
 // Returns: address:port ("127.0.0.1:32233")  or nil
 //
 func (o *Node) Get_address_all() string {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	address, port, success := o.get_address()
 	if success {
 		return fmt.Sprintf("%v:%v", address, port)
@@ -1401,8 +1412,8 @@ func (o *Node) Get_address_all() string {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormNodeGetCommand
 //
 func (o *Node) Get_command() (cmd *bytes.Buffer) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_command()
 }
 
@@ -1411,8 +1422,8 @@ func (o *Node) Get_command() (cmd *bytes.Buffer) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormNodeSetUnicastNack
 //
 func (o *Node) Set_unicast_nack(enable bool) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_unicast_nack(enable)
 }
 
@@ -1421,8 +1432,8 @@ func (o *Node) Set_unicast_nack(enable bool) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormNodeSetNackingMode
 //
 func (o *Node) Set_nacking_mode(mode Nacking_mode) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_nacking_mode(mode)
 }
 
@@ -1431,47 +1442,47 @@ func (o *Node) Set_nacking_mode(mode Nacking_mode) {
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormSetRepairBoundary
 //
 func (o *Node) Set_repair_boundary(boundary Repair_boundary) {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.set_repair_boundary(boundary)
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormNodeGetGrtt
 //
 func (o *Node) Get_grtt() float64 {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	return o.get_grtt()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormNodeFreeBuffers
 //
 func (o *Node) Free_buffers() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.free_buffers()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormNodeDelete
 //
 func (o *Node) Delete() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.delete()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormNodeRetain
 //
 func (o *Node) Retain() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.retain()
 }
 
 // https://htmlpreview.github.io/?https://github.com/aletheia7/norm/blob/master/norm/doc/NormDeveloperGuide.html#NormNodeRelease
 //
 func (o *Node) Release() {
-	lock.Lock()
-	defer lock.Unlock()
+	o.lock.Lock()
+	defer o.lock.Unlock()
 	o.release()
 }

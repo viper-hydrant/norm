@@ -41,14 +41,14 @@ var (
 func do_send() {
 	defer wg.Done()
 	defer cancel()
-	i, err := norm.Create_instance(wg)
+	i, err := norm.Create_instance(wg, &sync.Mutex{})
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	i.Set_debug(*debug_instance)
 	defer i.Destroy()
-	i.Set_debug_level(1)
+	i.Set_debug_level(*norm_debug_level)
 	log.Printf("sender session: %v:%v\n", *s_addr, *s_port)
 	sess, err := i.Create_session(*s_addr, *s_port, norm.Node_id(*s_node_id))
 	if err != nil {
@@ -128,14 +128,14 @@ func do_send() {
 func do_recv() {
 	defer wg.Done()
 	defer cancel()
-	i, err := norm.Create_instance(wg)
+	i, err := norm.Create_instance(wg, &sync.Mutex{})
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	i.Set_debug(*debug_instance)
 	defer i.Destroy()
-	i.Set_debug_level(1)
+	i.Set_debug_level(*norm_debug_level)
 	log.Printf("receiver session: %v:%v\n", *r_addr, *r_port)
 	sess, err := i.Create_session(*r_addr, *r_port, norm.Node_id(*r_node_id))
 	if err != nil {

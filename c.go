@@ -172,7 +172,7 @@ func (o *Instance) create_session(address string, port int, node_id Node_id) (se
 	sess.handle = C.NormSessionHandle(C.NormCreateSession(o.handle, ba.p, C.UINT16(port), C.NormNodeId(node_id)))
 	if sess.handle == C.NormSessionHandle(C.NORM_SESSION_INVALID) {
 		sess = nil
-		err = E_session_invalid
+		err = ESessionInvalid
 	} else {
 		o.sess_db.add(sess)
 	}
@@ -217,12 +217,12 @@ func (o *Session) set_tx_only(tx_only, connect_to_session_address bool) {
 }
 
 func (o *Session) data_enqueue(data, info []byte) (*Object, error) {
-	obj := new_object(data, info, Object_type_data)
+	obj := new_object(data, info, Object_type_data, o.lock)
 	if obj.handle = C.NormObjectHandle(C.NormDataEnqueue(o.handle, b2c(obj.data), b2UINT32(obj.data), b2c(obj.info), b2uint(obj.info))); obj.handle == C.NormObjectHandle(C.NORM_OBJECT_INVALID) {
-		return nil, E_object_invalid
+		return nil, EObjectInvalid
 	}
-	object_id_ct++
-	obj.Id = object_id_ct
+	o.objectIdCt++
+	obj.Id = o.objectIdCt
 	o.objects[obj.handle] = obj
 	return obj, nil
 }
@@ -235,15 +235,15 @@ func (o *Session) requeue_object(obj *Object) bool {
 }
 
 func (o *Session) file_enqueue(file_name string, info []byte) (*Object, error) {
-	obj := new_object(nil, info, Object_type_file)
+	obj := new_object(nil, info, Object_type_file, o.lock)
 	fn := C.CString(file_name)
 	defer C.free(unsafe.Pointer(fn))
 	obj.handle = C.NormObjectHandle(C.NormFileEnqueue(o.handle, fn, b2c(obj.info), b2uint(obj.info)))
 	if obj.handle == C.NormObjectHandle(C.NORM_OBJECT_INVALID) {
-		return nil, E_object_invalid
+		return nil, EObjectInvalid
 	}
-	object_id_ct++
-	obj.Id = object_id_ct
+	o.objectIdCt++
+	obj.Id = o.objectIdCt
 	o.objects[obj.handle] = obj
 	return obj, nil
 }
@@ -331,13 +331,13 @@ func (o *Session) set_default_rx_robust_factor(rx_robust_factor int) {
 }
 
 func (o *Session) stream_open(buffer_size int, info []byte) (obj *Object, err error) {
-	obj = new_object(nil, info, Object_type_stream)
+	obj = new_object(nil, info, Object_type_stream, o.lock)
 	if obj.handle = C.NormObjectHandle(C.NormStreamOpen(o.handle, C.UINT32(buffer_size), b2c(obj.info), b2uint(obj.info))); obj.handle == C.NormObjectHandle(C.NORM_OBJECT_INVALID) {
 		obj = nil
-		err = E_object_invalid
+		err = EObjectInvalid
 	} else {
-		object_id_ct++
-		obj.Id = object_id_ct
+		o.objectIdCt++
+		obj.Id = o.objectIdCt
 		o.objects[obj.handle] = obj
 	}
 	return
@@ -568,7 +568,7 @@ func (o *Object) data_access_data(release bool) (data *bytes.Buffer) {
 
 func (o *Object) get_sender() (node *Node) {
 	if h := C.NormObjectGetSender(o.handle); h != C.NORM_NODE_INVALID {
-		node = new_node(h)
+		node = new_node(h, o.lock)
 	}
 	return
 }
@@ -740,13 +740,13 @@ func (o *Instance) do_event() error {
 	case Event_type_remote_sender_new, Event_type_remote_sender_active, Event_type_remote_sender_inactive,
 		Event_type_remote_sender_purged, Event_type_rx_cmd_new:
 		e := new_event(ev, nil)
-		e.Node = new_node(o.nevent.sender)
+		e.Node = new_node(o.nevent.sender, o.lock)
 		o.sess().c <- e
 	case Event_type_rx_object_new:
-		obj := new_object_buf(nil, nil, Object_type(C.NormObjectGetType(o.nevent.object)))
+		obj := new_object_buf(nil, nil, Object_type(C.NormObjectGetType(o.nevent.object)), o.sess().lock)
 		obj.handle = o.nevent.object
-		object_id_ct++
-		obj.Id = object_id_ct
+		o.sess().objectIdCt++
+		obj.Id = o.sess().objectIdCt
 		o.sess().objects[obj.handle] = obj
 		o.sess().c <- new_event(ev, obj)
 	case Event_type_rx_object_aborted:
@@ -824,9 +824,9 @@ func (o *Instance) descriptor_ready(shutdown *os.File) {
 			for i := 0; i < n; i++ {
 				switch {
 				case events[i].Fd == int32(desc.Fd()):
-					lock.Lock()
+					o.lock.Lock()
 					o.do_event()
-					lock.Unlock()
+					o.lock.Unlock()
 				case events[i].Fd == int32(shutdown.Fd()):
 					return
 				}
