@@ -71,7 +71,7 @@ func do_send() {
 	}
 	defer sess.Stop_sender()
 	info := bytes.NewBufferString(fmt.Sprintf("stream size: %v", *size))
-	obj, err := sess.Stream_open(4*1024*1024, info.Bytes())
+	obj, err := sess.Stream_open(10*1024*1024, info.Bytes())
 	if err != nil {
 		log.Println(err)
 		return
@@ -146,7 +146,7 @@ func do_recv() {
 	sess.Set_events(norm.Event_type_all &^ norm.Event_type_grtt_updated)
 	sess.Set_default_unicast_nack(true)
 	sess.Set_rx_cache_limit(4096)
-	if !sess.Start_receiver(8 * 1024 * 1024) {
+	if !sess.Start_receiver(12 * 1024 * 1024) {
 		log.Println(err)
 		return
 	}

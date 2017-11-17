@@ -824,9 +824,11 @@ func (o *Instance) descriptor_ready(shutdown *os.File) {
 			for i := 0; i < n; i++ {
 				switch {
 				case events[i].Fd == int32(desc.Fd()):
-					o.lock.Lock()
-					o.do_event()
-					o.lock.Unlock()
+					func (){
+						lockNotNil(o.lock)
+						defer unlockNotNil(o.lock)
+						o.do_event()
+					}()
 				case events[i].Fd == int32(shutdown.Fd()):
 					return
 				}
